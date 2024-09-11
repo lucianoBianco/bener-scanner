@@ -1,0 +1,15 @@
+{
+  "projects": {
+    "default": "bener-dashboard"
+  },
+  "targets": {
+    "bener-dashboard": {
+      "hosting": {
+        "meuTarget": [
+          "bener-scanner"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}
