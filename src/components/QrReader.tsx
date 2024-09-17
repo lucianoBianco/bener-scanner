@@ -131,7 +131,7 @@ const QrReader = () => {
           accessAt: new Date(),
         })
       } else {
-        await setDoc(newRef, {
+        await updateDoc(newRef, {
           name: readUserData?.name,
           email: readUserData?.email,
           phone: readUserData?.phone,
