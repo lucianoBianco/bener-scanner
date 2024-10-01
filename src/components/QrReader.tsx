@@ -122,29 +122,39 @@ const QrReader = () => {
       }
       await updateDoc(ref, { entrance_2024: true })
       const newRef = doc(fireStore, 'entrances_2024', readUserData.id)
-      if (readUserData?.entrance_2024) {
+      if (!readUserData?.entrance_2024) {
         await setDoc(newRef, {
-          name: readUserData?.name,
-          email: readUserData?.email,
-          phone: readUserData?.phone,
-          company: readUserData?.company,
+          name: readUserData?.name ?? '',
+          email: readUserData?.email ?? '',
+          phone: readUserData?.phone ?? '',
+          company: readUserData?.company ?? '',
           accessAt: new Date(),
         })
       } else {
-        await updateDoc(newRef, {
-          name: readUserData?.name,
-          email: readUserData?.email,
-          phone: readUserData?.phone,
-          company: readUserData?.company,
-          lastAccessAt: new Date(),
-        })
+        try {
+          await updateDoc(newRef, {
+            name: readUserData?.name ?? '',
+            email: readUserData?.email ?? '',
+            phone: readUserData?.phone ?? '',
+            company: readUserData?.company ?? '',
+            lastAccessAt: new Date(),
+          })
+        } catch (e: any) {
+          await setDoc(newRef, {
+            name: readUserData?.name ?? '',
+            email: readUserData?.email ?? '',
+            phone: readUserData?.phone ?? '',
+            company: readUserData?.company ?? '',
+            accessAt: new Date(),
+          })
+        }
       }
       setScannedResult(undefined)
       setReadUserData(null)
-      // Reinicia o scanner
-      // if (scanner.current) {
-      //   await scanner.current.start()
-      // }
+      // // Reinicia o scanner
+      // // if (scanner.current) {
+      // //   await scanner.current.start()
+      // // }
     } catch (error: any) {
       alert(error?.message)
     } finally {

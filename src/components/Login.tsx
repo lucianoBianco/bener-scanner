@@ -24,7 +24,7 @@ const Login = () => {
   return (
     <div
       style={{
-        flex: 1,
+        width: 'vw',
 
         justifyContent: 'center',
         alignItems: 'center',
@@ -54,7 +54,7 @@ const Login = () => {
       <form onSubmit={handleLogin}>
         <input
           style={{
-            width: '99%',
+            width: '95%',
             height: 50,
             borderColor: '#ccc',
             borderWidth: 1,
