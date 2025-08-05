@@ -6,7 +6,7 @@ import './QrStyles.css'
 // Qr Scanner
 import QrScanner from 'qr-scanner'
 import QrFrame from '../assets/qr-frame.svg'
-import { doc, getDoc, collection, addDoc } from 'firebase/firestore'
+import { doc, getDoc, collection, addDoc, where, query, getDocs } from 'firebase/firestore'
 import { fireStore, fireAuth } from '../firebase'
 
 interface ExhibitorReaderProps {
@@ -23,6 +23,7 @@ const ExhibitorReader = ({ onBackToWelcome }: ExhibitorReaderProps) => {
 
   // Result
   const [scannedResult, setScannedResult] = useState<string | undefined>('')
+  const [isInspected, setIsInspected] = useState<boolean>(false)
 
   // Rating and Notes
   const [rating, setRating] = useState<number>(0)
@@ -87,6 +88,11 @@ const ExhibitorReader = ({ onBackToWelcome }: ExhibitorReaderProps) => {
 
   useEffect(() => {
     const getUser = async () => {
+      const currentUser = fireAuth.currentUser
+      if (!currentUser) {
+        alert('Usuário não autenticado')
+        return
+      }
       if (scannedResult?.includes('readqrcode-x7ty67bfhq-uc')) {
         const split = scannedResult.split('?id=')
         const docExpRef = doc(fireStore, 'exhibitors', split[1])
@@ -102,7 +108,16 @@ const ExhibitorReader = ({ onBackToWelcome }: ExhibitorReaderProps) => {
         } else {
           docC = docExpSnap
         }
-
+        // Check if docC exists before using its id
+        const interactionsRef = docC?.id ? collection(fireStore, 'exhibitors', currentUser?.uid, 'interactions') : null;
+        const interactionsQuery = interactionsRef ? query(interactionsRef, where('visitorId', '==', split[1])) : null;
+        const querySnapshot = interactionsQuery ? await getDocs(interactionsQuery) : null;
+        const isInspected = !querySnapshot?.empty;
+        
+        // if isInspected is true, show a text somewhere in the page saying "Interação já avaliada"
+        if (isInspected) {
+          setIsInspected(true)
+        }
         setReadUserData({ id: docC?.id, ...docC?.data() })
       }
     }
@@ -316,22 +331,45 @@ const ExhibitorReader = ({ onBackToWelcome }: ExhibitorReaderProps) => {
                 >
                   {readUserData?.company}
                 </p>
-                
+              </div>
+              {isInspected && (
                 <div 
                   style={{
-                    marginTop: '16px',
-                    padding: '8px 16px',
-                    backgroundColor: '#3498db',
-                    color: '#fff',
-                    borderRadius: '20px',
-                    display: 'inline-block',
-                    fontSize: '14px',
-                    fontWeight: '600',
+                    marginBottom: '20px',
+                    padding: '12px 16px',
+                    backgroundColor: '#fff3cd',
+                    border: '1px solid #ffeaa7',
+                    borderRadius: '8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
                   }}
                 >
-                  Visitante
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    style={{ color: '#856404', flexShrink: 0 }}
+                  >
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="12" y1="8" x2="12" y2="12" />
+                    <line x1="12" y1="16" x2="12.01" y2="16" />
+                  </svg>
+                  <span style={{ 
+                    fontSize: '14px', 
+                    fontWeight: '500', 
+                    color: '#856404',
+                    margin: '0'
+                  }}>
+                    Interação já avaliada
+                  </span>
                 </div>
-              </div>
+              )}
 
               {/* Rating Section */}
               <div style={{ marginBottom: '20px' }}>
