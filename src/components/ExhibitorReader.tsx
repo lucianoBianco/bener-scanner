@@ -6,43 +6,43 @@ import './QrStyles.css'
 // Qr Scanner
 import QrScanner from 'qr-scanner'
 import QrFrame from '../assets/qr-frame.svg'
-import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore'
-import { fireStore } from '../firebase'
+import { doc, getDoc, collection, addDoc } from 'firebase/firestore'
+import { fireStore, fireAuth } from '../firebase'
 
-interface QrReaderProps {
+interface ExhibitorReaderProps {
   onBackToWelcome?: () => void
 }
 
-const QrReader = ({ onBackToWelcome }: QrReaderProps) => {
+const ExhibitorReader = ({ onBackToWelcome }: ExhibitorReaderProps) => {
   // QR States
   const scanner = useRef<QrScanner>()
   const videoEl = useRef<HTMLVideoElement>(null)
   const qrBoxEl = useRef<HTMLDivElement>(null)
   const [qrOn, setQrOn] = useState<boolean>(true)
   const [readUserData, setReadUserData] = useState<any>(null)
-  const [loading, setLoading] = useState<boolean>(false)
 
   // Result
   const [scannedResult, setScannedResult] = useState<string | undefined>('')
 
+  // Rating and Notes
+  const [rating, setRating] = useState<number>(0)
+  const [notes, setNotes] = useState<string>('')
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false)
+
   // Success
   const onScanSuccess = (result: QrScanner.ScanResult) => {
-    // 🖨 Print the "result" to browser console.
     console.log(result)
-    // ✅ Handle success.
-    // 😎 You can do whatever you want with the scanned result.
     setScannedResult(result?.data)
   }
 
   // Fail
   const onScanFail = (err: string | Error) => {
-    // 🖨 Print the "err" to browser console.
     console.log(err)
   }
+
   useEffect(() => {
     const initializeScanner = () => {
       if (videoEl?.current && !scanner.current) {
-        // 👉 Instantiate the QR Scanner
         scanner.current = new QrScanner(videoEl?.current, onScanSuccess, {
           onDecodeError: onScanFail,
           preferredCamera: 'environment',
@@ -51,7 +51,6 @@ const QrReader = ({ onBackToWelcome }: QrReaderProps) => {
           overlay: qrBoxEl?.current || undefined,
         })
 
-        // 🚀 Start QR Scanner
         scanner.current
           .start()
           .then(() => setQrOn(true))
@@ -61,13 +60,11 @@ const QrReader = ({ onBackToWelcome }: QrReaderProps) => {
       }
     }
 
-    // Re-initialize the scanner when `scannedResult` is reset
     if (!scannedResult) {
       if (scanner.current) {
-        // Stop the current scanner before restarting
         scanner.current.stop()
         scanner.current = undefined
-        initializeScanner() // Re-initialize scanner
+        initializeScanner()
       } else {
         initializeScanner()
       }
@@ -112,58 +109,66 @@ const QrReader = ({ onBackToWelcome }: QrReaderProps) => {
     getUser()
   }, [scannedResult])
 
-  const handleRegisterAccess = async () => {
-    setLoading(true)
+  const handleSaveInteraction = async () => {
+    setIsSubmitting(true)
     try {
-      const docExpRef = doc(fireStore, 'exhibitors', readUserData.id)
-      const docExpSnap = await getDoc(docExpRef)
-      let ref
-      if (!docExpSnap.exists()) {
-        const docVisRef = doc(fireStore, 'visitors', readUserData.id)
-        ref = docVisRef
-      } else {
-        ref = docExpRef
+      const currentUser = fireAuth.currentUser
+      if (!currentUser) {
+        alert('Usuário não autenticado')
+        return
       }
-      await updateDoc(ref, { entrance_2024: true })
-      const newRef = doc(fireStore, 'entrances_2024', readUserData.id)
-      if (!readUserData?.entrance_2024) {
-        await setDoc(newRef, {
-          name: readUserData?.name ?? '',
-          email: readUserData?.email ?? '',
-          phone: readUserData?.phone ?? '',
-          company: readUserData?.company ?? '',
-          accessAt: new Date(),
-        })
-      } else {
-        try {
-          await updateDoc(newRef, {
-            name: readUserData?.name ?? '',
-            email: readUserData?.email ?? '',
-            phone: readUserData?.phone ?? '',
-            company: readUserData?.company ?? '',
-            lastAccessAt: new Date(),
-          })
-        } catch (e: any) {
-          await setDoc(newRef, {
-            name: readUserData?.name ?? '',
-            email: readUserData?.email ?? '',
-            phone: readUserData?.phone ?? '',
-            company: readUserData?.company ?? '',
-            accessAt: new Date(),
-          })
-        }
+
+      // Save interaction to exhibitor's personal list
+      const interactionData = {
+        visitorId: readUserData.id,
+        visitorName: readUserData?.name || '',
+        visitorCompany: readUserData?.company || '',
+        visitorEmail: readUserData?.email || '',
+        rating: rating,
+        notes: notes,
+        interactionDate: new Date(),
+        2025: true
       }
+
+      console.log(interactionData)
+      await addDoc(collection(fireStore, 'exhibitors', currentUser.uid, 'interactions'), interactionData)
+
+      // Reset form
       setScannedResult(undefined)
       setReadUserData(null)
-      // // Reinicia o scanner
-      // // if (scanner.current) {
-      // //   await scanner.current.start()
-      // // }
+      setRating(0)
+      setNotes('')
     } catch (error: any) {
-      alert(error?.message)
+      alert(error?.message || 'Erro ao salvar interação')
     } finally {
-      setLoading(false)
+      setIsSubmitting(false)
     }
+  }
+
+  const renderStars = () => {
+    return (
+      <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+        {[1, 2, 3].map((star) => (
+          <button
+            key={star}
+            onClick={() => setRating(star)}
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              fontSize: '24px',
+              color: star <= rating ? '#ffd700' : '#ddd',
+              transition: 'color 0.2s ease',
+            }}
+          >
+            ★
+          </button>
+        ))}
+        <span style={{ fontSize: '14px', color: '#666', marginLeft: '8px' }}>
+          {rating > 0 ? `${rating}/3` : 'Avaliar interação'}
+        </span>
+      </div>
+    )
   }
 
   return (
@@ -178,7 +183,7 @@ const QrReader = ({ onBackToWelcome }: QrReaderProps) => {
         position: 'relative',
       }}
     >
-      {/* Back Button - Only show when scanner is active (not when showing results) */}
+      {/* Back Button - Only show when scanner is active */}
       {onBackToWelcome && !scannedResult && (
         <button
           style={{
@@ -251,8 +256,8 @@ const QrReader = ({ onBackToWelcome }: QrReaderProps) => {
                 width: '100%',
                 height: '56px',
                 border: '2px solid #7ca066',
-              backgroundColor: 'transparent',
-              color: '#7ca066',
+                backgroundColor: 'transparent',
+                color: '#7ca066',
                 fontSize: '16px',
                 fontWeight: '600',
                 borderRadius: '12px',
@@ -262,12 +267,14 @@ const QrReader = ({ onBackToWelcome }: QrReaderProps) => {
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: '8px',
-            }}
-            disabled={loading}
-            onClick={() => {
-              setScannedResult(undefined)
-              setReadUserData(null)
-            }}
+              }}
+              disabled={isSubmitting}
+              onClick={() => {
+                setScannedResult(undefined)
+                setReadUserData(null)
+                setRating(0)
+                setNotes('')
+              }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.backgroundColor = '#7ca066'
                 e.currentTarget.style.color = '#fff'
@@ -278,10 +285,10 @@ const QrReader = ({ onBackToWelcome }: QrReaderProps) => {
               }}
             >
               ← Ler Novo QRCode
-          </button>
+            </button>
             
-          <div
-            style={{
+            <div
+              style={{
                 border: '2px solid #7ca066',
                 borderRadius: '16px',
                 padding: '24px',
@@ -307,24 +314,6 @@ const QrReader = ({ onBackToWelcome }: QrReaderProps) => {
                     color: '#7f8c8d',
                   }}
                 >
-                  {readUserData?.email}
-                </p>
-                <p 
-                  style={{
-                    fontSize: '16px',
-                    margin: '4px 0',
-                    color: '#7f8c8d',
-                  }}
-                >
-                  {readUserData?.phone}
-                </p>
-                <p 
-                  style={{
-                    fontSize: '16px',
-                    margin: '4px 0',
-                    color: '#7f8c8d',
-                  }}
-                >
                   {readUserData?.company}
                 </p>
                 
@@ -332,7 +321,7 @@ const QrReader = ({ onBackToWelcome }: QrReaderProps) => {
                   style={{
                     marginTop: '16px',
                     padding: '8px 16px',
-                    backgroundColor: '#7ca066',
+                    backgroundColor: '#3498db',
                     color: '#fff',
                     borderRadius: '20px',
                     display: 'inline-block',
@@ -340,87 +329,79 @@ const QrReader = ({ onBackToWelcome }: QrReaderProps) => {
                     fontWeight: '600',
                   }}
                 >
-                  {readUserData?.role === 'visitor' && 'Visitante'}
-                  {readUserData?.role === 'exhibitor' && 'Expositor'}
-                  {readUserData?.role === 'admin' && 'Parceiro'}
+                  Visitante
                 </div>
               </div>
 
-            {readUserData?.entrance_2024 ? (
-              <>
-                  <div 
-                    style={{
-                      padding: '12px 16px',
-                      backgroundColor: '#fff3cd',
-                      border: '1px solid #ffeaa7',
-                      borderRadius: '8px',
-                      marginBottom: '16px',
-                    }}
-                  >
-                    <p 
-                      style={{
-                        color: '#856404',
-                        fontSize: '14px',
-                        margin: '0',
-                        textAlign: 'center',
-                      }}
-                    >
-                  Visitante já teve seu acesso registrado
-                </p>
-                  </div>
-                <button
+              {/* Rating Section */}
+              <div style={{ marginBottom: '20px' }}>
+                <h4
+                  style={{
+                    fontSize: '16px',
+                    fontWeight: '600',
+                    color: '#2c3e50',
+                    margin: '0 0 8px 0',
+                  }}
+                >
+                  Avaliar Interação (Opcional)
+                </h4>
+                {renderStars()}
+              </div>
+
+              {/* Notes Section */}
+              <div style={{ marginBottom: '20px' }}>
+                <h4
+                  style={{
+                    fontSize: '16px',
+                    fontWeight: '600',
+                    color: '#2c3e50',
+                    margin: '0 0 8px 0',
+                  }}
+                >
+                  Detalhes da Interação (Opcional)
+                </h4>
+                <textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Ex: Interessado no produto X, demonstrou interesse em fechar negócio..."
                   style={{
                     width: '100%',
-                      height: '56px',
-                      border: '2px solid #7ca066',
-                    backgroundColor: 'transparent',
-                    color: '#7ca066',
-                      fontSize: '16px',
-                      fontWeight: '600',
-                      borderRadius: '12px',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s ease',
+                    minHeight: '80px',
+                    padding: '12px',
+                    border: '1px solid #ddd',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    fontFamily: 'inherit',
+                    resize: 'vertical',
+                    boxSizing: 'border-box',
                   }}
-                  disabled={loading}
-                  onClick={handleRegisterAccess}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = '#7ca066'
-                      e.currentTarget.style.color = '#fff'
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = 'transparent'
-                      e.currentTarget.style.color = '#7ca066'
-                    }}
-                  >
-                    {loading ? 'Registrando...' : 'Registrar nova entrada'}
-                </button>
-              </>
-            ) : (
+                />
+              </div>
+
               <button
                 style={{
                   width: '100%',
-                    height: '56px',
+                  height: '56px',
                   backgroundColor: '#7ca066',
                   color: '#fff',
-                    fontSize: '16px',
-                    fontWeight: '600',
-                    border: 'none',
-                    borderRadius: '12px',
-                    cursor: 'pointer',
-                    transition: 'background-color 0.2s ease',
+                  fontSize: '16px',
+                  fontWeight: '600',
+                  border: 'none',
+                  borderRadius: '12px',
+                  cursor: 'pointer',
+                  transition: 'background-color 0.2s ease',
                 }}
-                onClick={handleRegisterAccess}
-                disabled={loading}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = '#6b8f5a'
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = '#7ca066'
-                  }}
-                >
-                  {loading ? 'Registrando...' : 'Registrar entrada'}
+                onClick={handleSaveInteraction}
+                disabled={isSubmitting}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#6b8f5a'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#7ca066'
+                }}
+              >
+                {isSubmitting ? 'Salvando...' : 'OK - Salvar Contato'}
               </button>
-            )}
             </div>
           </div>
         </div>
@@ -484,7 +465,7 @@ const QrReader = ({ onBackToWelcome }: QrReaderProps) => {
               backdropFilter: 'blur(10px)',
             }}
           >
-            Posicione o QR Code dentro da área
+            Escaneie o QR Code do visitante
           </div>
         </div>
       )}
@@ -492,4 +473,4 @@ const QrReader = ({ onBackToWelcome }: QrReaderProps) => {
   )
 }
 
-export default QrReader
+export default ExhibitorReader 
