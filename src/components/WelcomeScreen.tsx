@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { signOut } from 'firebase/auth'
-import { fireAuth } from '../firebase'
+import { fireAuth, fireStore } from '../firebase'
 import logo from '../assets/XIII-Encontro-Tecnologico-Bener.png'
+import { collection, getDocs } from 'firebase/firestore'
 
 interface WelcomeScreenProps {
   onStartScanning: () => void
@@ -11,6 +12,7 @@ interface WelcomeScreenProps {
 const WelcomeScreen = ({ onStartScanning, isAdmin = false }: WelcomeScreenProps) => {
   const [isLoading, setIsLoading] = useState(false)
   const [isLoggingOut, setIsLoggingOut] = useState(false)
+  const [interactions, setInteractions] = useState<any>(false)
 
   const handleStartScanning = () => {
     setIsLoading(true)
@@ -29,6 +31,16 @@ const WelcomeScreen = ({ onStartScanning, isAdmin = false }: WelcomeScreenProps)
     } finally {
       setIsLoggingOut(false)
     }
+  }
+  const getInteractions = async () => {
+    const currentUser = fireAuth.currentUser
+    if(!currentUser) {
+      alert('Usuario Não autentificado')
+      return
+    }
+    const interactionsReference = await getDocs(collection(fireStore, 'exhibitors',currentUser.uid, 'interactions'))
+    const interactionsDocuments = interactionsReference.docs
+    setInteractions(interactionsDocuments.map(doc => ({...doc.data(), id: doc.id})))
   }
 
   return (
@@ -333,6 +345,22 @@ const WelcomeScreen = ({ onStartScanning, isAdmin = false }: WelcomeScreenProps)
             </>
           )}
         </button>
+        <div
+        style={{
+          flexGrow: 1,
+          alignItems: 'left'
+
+        }}
+        >
+
+          <div
+          style={{
+            outline: 'solid'
+          }}
+          >
+            <h3>Nome do cara</h3>
+          </div>
+        </div>
 
         {/* Footer */}
         <p

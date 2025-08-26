@@ -139,6 +139,9 @@ const ExhibitorReader = ({ onBackToWelcome }: ExhibitorReaderProps) => {
         visitorName: readUserData?.name || '',
         visitorCompany: readUserData?.company || '',
         visitorEmail: readUserData?.email || '',
+        visitorCity: readUserData?.city || '',
+        visitorState: readUserData?.uf || '',
+        visitorPhone: readUserData?.phone  || '',
         rating: rating,
         notes: notes,
         interactionDate: new Date(),
@@ -163,7 +166,7 @@ const ExhibitorReader = ({ onBackToWelcome }: ExhibitorReaderProps) => {
   const renderStars = () => {
     return (
       <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
-        {[1, 2, 3].map((star) => (
+        {[1, 2, 3, 4, 5].map((star) => (
           <button
             key={star}
             onClick={() => setRating(star)}
@@ -180,7 +183,7 @@ const ExhibitorReader = ({ onBackToWelcome }: ExhibitorReaderProps) => {
           </button>
         ))}
         <span style={{ fontSize: '14px', color: '#666', marginLeft: '8px' }}>
-          {rating > 0 ? `${rating}/3` : 'Avaliar interação'}
+          {rating > 0 ? `${rating}/5` : 'Avaliar interação'}
         </span>
       </div>
     )
@@ -330,6 +333,16 @@ const ExhibitorReader = ({ onBackToWelcome }: ExhibitorReaderProps) => {
                   }}
                 >
                   {readUserData?.company}
+                </p>
+                <p 
+                  style={{
+                    fontSize: '16px',
+                    margin: '4px 0',
+                    color: '#7f8c8d',
+                  }}
+                >
+                  {readUserData?.city} - {readUserData?.uf}
+                  
                 </p>
               </div>
               {isInspected && (
