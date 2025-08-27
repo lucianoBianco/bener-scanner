@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { signOut } from 'firebase/auth'
 import { fireAuth, fireStore } from '../firebase'
 import logo from '../assets/XIII-Encontro-Tecnologico-Bener.png'
-import { collection, getDocs } from 'firebase/firestore'
+import { collection, getDocs, limit, orderBy, query } from 'firebase/firestore'
 
 interface WelcomeScreenProps {
   onStartScanning: () => void
@@ -38,9 +38,34 @@ const WelcomeScreen = ({ onStartScanning, isAdmin = false }: WelcomeScreenProps)
       alert('Usuario Não autentificado')
       return
     }
-    const interactionsReference = await getDocs(collection(fireStore, 'exhibitors',currentUser.uid, 'interactions'))
+    const interactionsReference = await  getDocs(query(collection(fireStore, 'exhibitors', currentUser.uid, 'interactions'), orderBy('interactionDate', 'desc'), limit(10)))
     const interactionsDocuments = interactionsReference.docs
     setInteractions(interactionsDocuments.map(doc => ({...doc.data(), id: doc.id})))
+  }
+  useEffect(() => {
+    getInteractions()
+  }, [])
+
+  const renderStars = (rating: number) => {
+    return (
+      <div style={{ display: 'flex', gap: '8px' }}>
+        {[1, 2, 3, 4, 5].map((star) => (
+          <button
+            key={star}
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              fontSize: '24px',
+              color: star <= rating ? '#ffd700' : '#ddd',
+              transition: 'color 0.2s ease',
+            }}
+          >
+            ★
+          </button>
+        ))}
+      </div>
+    )
   }
 
   return (
@@ -345,22 +370,33 @@ const WelcomeScreen = ({ onStartScanning, isAdmin = false }: WelcomeScreenProps)
             </>
           )}
         </button>
-        <div
-        style={{
-          flexGrow: 1,
-          alignItems: 'left'
-
-        }}
-        >
-
-          <div
-          style={{
-            outline: 'solid'
-          }}
-          >
-            <h3>Nome do cara</h3>
-          </div>
-        </div>
+       
+          <div style={{
+          flex: 1,
+          width: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'flex-start',
+        }}>
+          {interactions.map((interaction: any) => {
+            const name = interaction.visitorName;
+            const company = interaction.visitorCompany;
+            const rating = interaction.rating;
+            const date = new Date(interaction.interactionDate.toDate()).toLocaleString();
+            return (
+              <div style={{ outline: 'solid 2px #a0a0a0', textAlign: 'left', padding: '10px', marginBottom: '15px', borderRadius: '10px', }}>
+                <h3>
+                  {name} - <span style={{ fontSize: '12px', color: '#666' }}>{company}</span>
+                </h3>
+                <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '14px' }}>{renderStars(rating)}</span>
+                  <span style={{ fontSize: '12px' }}>{date}</span>
+                </div>
+              </div>)
+          })
+          }
+      </div>
+       
 
         {/* Footer */}
         <p
