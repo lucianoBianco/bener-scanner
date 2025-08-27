@@ -12,7 +12,7 @@ interface WelcomeScreenProps {
 const WelcomeScreen = ({ onStartScanning, isAdmin = false }: WelcomeScreenProps) => {
   const [isLoading, setIsLoading] = useState(false)
   const [isLoggingOut, setIsLoggingOut] = useState(false)
-  const [interactions, setInteractions] = useState<any>(false)
+  const [interactions, setInteractions] = useState<any>([])
 
   const handleStartScanning = () => {
     setIsLoading(true)
