@@ -11,20 +11,39 @@ import { fireStore } from '../firebase'
 
 interface QrReaderProps {
   onBackToWelcome?: () => void
+  defaultSuperiorFloorAccess?: boolean
 }
 
-const QrReader = ({ onBackToWelcome }: QrReaderProps) => {
+const QrReader = ({ onBackToWelcome, defaultSuperiorFloorAccess = false }: QrReaderProps) => {
   // QR States
   const scanner = useRef<QrScanner>()
   const videoEl = useRef<HTMLVideoElement>(null)
   const qrBoxEl = useRef<HTMLDivElement>(null)
   const [qrOn, setQrOn] = useState<boolean>(true)
-  const [readUserData, setReadUserData] = useState<any>(null)
+  const [readUserData, setReadUserData] = useState<{
+    id: string;
+    name?: string;
+    email?: string;
+    phone?: string;
+    company?: string;
+    entrance_2025?: boolean;
+    [key: string]: unknown;
+  } | null>(null)
   const [loading, setLoading] = useState<boolean>(false)
+  const [benerHeadquartersAccess, setBenerHeadquartersAccess] = useState<boolean>(defaultSuperiorFloorAccess)
+  const [machines, setMachines] = useState<boolean>(false)
+  const [isEligibleForRaffle, setIsEligibleForRaffle] = useState<boolean>(false)
+  const [alexa1, setAlexa1] = useState<boolean>(false)
+  const [alexa2, setAlexa2] = useState<boolean>(false)
+  const [alexa3, setAlexa3] = useState<boolean>(false)
+  // const [log, setLog] = useState('');
 
   // Result
   const [scannedResult, setScannedResult] = useState<string | undefined>('')
 
+  // useEffect(() => {
+  //   setScannedResult(`https://readqrcode-x7ty67bfhq-uc.a.run.app/?id=hEh72zQs5Zkv4o60lrOE`)
+  // }, [])
   // Success
   const onScanSuccess = (result: QrScanner.ScanResult) => {
     // 🖨 Print the "result" to browser console.
@@ -106,13 +125,44 @@ const QrReader = ({ onBackToWelcome }: QrReaderProps) => {
           docC = docExpSnap
         }
 
-        setReadUserData({ id: docC?.id, ...docC?.data() })
+        if (docC?.id) {
+          setReadUserData({ id: docC.id, ...docC.data() })
+        }
+        // Reset Bener headquarters access to default when new QR code is read
+        setBenerHeadquartersAccess(defaultSuperiorFloorAccess)
+        
+        // Check if user is eligible for raffle (registered in entrance_2025)
+        if (docC?.id) {
+          const isEligible = docC.data()?.entrance_2025
+          setIsEligibleForRaffle(isEligible)
+        } else return;
+        
+        // Get existing entrance data if available
+        const entranceRef = doc(fireStore, 'entrances_2025', docC.id)
+        const entranceSnap = await getDoc(entranceRef)
+        if (entranceSnap.exists()) {
+          const entranceData = entranceSnap.data()
+          // setLog(entranceData.alexa2)
+          setBenerHeadquartersAccess(entranceData.benerHeadquartersAccess ?? defaultSuperiorFloorAccess)
+          setMachines(entranceData.machines ?? false)
+          setAlexa1(entranceData.alexa1 ?? false) 
+          setAlexa2(entranceData.alexa2 ?? false)
+          setAlexa3(entranceData.alexa3 ?? false)
+        } else {
+          // Reset raffle participation to default when new QR code is read
+          setMachines(false)
+          setAlexa1(false)
+          setAlexa2(false)
+          setAlexa3(false)
+        }
       }
     }
     getUser()
-  }, [scannedResult])
+  }, [scannedResult, defaultSuperiorFloorAccess])
 
   const handleRegisterAccess = async () => {
+    if (!readUserData?.id) return
+    
     setLoading(true)
     try {
       const docExpRef = doc(fireStore, 'exhibitors', readUserData.id)
@@ -124,32 +174,43 @@ const QrReader = ({ onBackToWelcome }: QrReaderProps) => {
       } else {
         ref = docExpRef
       }
-      await updateDoc(ref, { entrance_2024: true })
-      const newRef = doc(fireStore, 'entrances_2024', readUserData.id)
-      if (!readUserData?.entrance_2024) {
+      await updateDoc(ref, { entrance_2025: true })
+      const newRef = doc(fireStore, 'entrances_2025', readUserData.id)
+      if (!readUserData?.entrance_2025) {
         await setDoc(newRef, {
           name: readUserData?.name ?? '',
           email: readUserData?.email ?? '',
           phone: readUserData?.phone ?? '',
           company: readUserData?.company ?? '',
-          accessAt: new Date(),
+          accessAt2025: new Date(),
+          benerHeadquartersAccess: benerHeadquartersAccess,
+          machines: machines,
+          alexa1: alexa1,
+          alexa2: alexa2,
+          alexa3: alexa3,
         })
       } else {
         try {
           await updateDoc(newRef, {
-            name: readUserData?.name ?? '',
-            email: readUserData?.email ?? '',
-            phone: readUserData?.phone ?? '',
-            company: readUserData?.company ?? '',
-            lastAccessAt: new Date(),
+            lastAccessAt2025: new Date(),
+            benerHeadquartersAccess: benerHeadquartersAccess,
+            machines: machines,
+            alexa1: alexa1,
+            alexa2: alexa2,
+            alexa3: alexa3,
           })
-        } catch (e: any) {
+        } catch (e: unknown) {
           await setDoc(newRef, {
             name: readUserData?.name ?? '',
             email: readUserData?.email ?? '',
             phone: readUserData?.phone ?? '',
             company: readUserData?.company ?? '',
-            accessAt: new Date(),
+            accessAt2025: new Date(),
+            benerHeadquartersAccess: benerHeadquartersAccess,
+            machines: machines,
+            alexa1: alexa1,
+            alexa2: alexa2,
+            alexa3: alexa3,
           })
         }
       }
@@ -159,8 +220,8 @@ const QrReader = ({ onBackToWelcome }: QrReaderProps) => {
       // // if (scanner.current) {
       // //   await scanner.current.start()
       // // }
-    } catch (error: any) {
-      alert(error?.message)
+    } catch (error: unknown) {
+      alert(error instanceof Error ? error.message : 'Erro desconhecido')
     } finally {
       setLoading(false)
     }
@@ -232,8 +293,10 @@ const QrReader = ({ onBackToWelcome }: QrReaderProps) => {
             display: 'flex',
             flexDirection: 'column',
             padding: '20px',
+            paddingBottom: '40px',
             boxSizing: 'border-box',
             backgroundColor: '#fff',
+            overflowY: 'auto',
           }}
         >
           <div
@@ -279,7 +342,7 @@ const QrReader = ({ onBackToWelcome }: QrReaderProps) => {
             >
               ← Ler Novo QRCode
           </button>
-            
+          {/* <p>{JSON.stringify(log)}</p> */}
           <div
             style={{
                 border: '2px solid #7ca066',
@@ -346,7 +409,231 @@ const QrReader = ({ onBackToWelcome }: QrReaderProps) => {
                 </div>
               </div>
 
-            {readUserData?.entrance_2024 ? (
+              {/* Superior Floor Access Checkbox */}
+              <div
+                style={{
+                  marginBottom: '20px',
+                  padding: '16px',
+                  backgroundColor: '#f8f9fa',
+                  borderRadius: '12px',
+                  border: '1px solid #e9ecef',
+                }}
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    cursor: 'pointer',
+                  }}
+                  onClick={() => setBenerHeadquartersAccess(!benerHeadquartersAccess)}
+                >
+                  <div
+                    style={{
+                      width: '20px',
+                      height: '20px',
+                      border: '2px solid #7ca066',
+                      borderRadius: '4px',
+                      backgroundColor: benerHeadquartersAccess ? '#7ca066' : 'transparent',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      transition: 'all 0.2s ease',
+                    }}
+                  >
+                    {benerHeadquartersAccess && (
+                      <svg
+                        width="12"
+                        height="12"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="white"
+                        strokeWidth="3"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <polyline points="20,6 9,17 4,12" />
+                      </svg>
+                    )}
+                  </div>
+                  <span
+                    style={{
+                      fontSize: '16px',
+                      fontWeight: '500',
+                      color: '#2c3e50',
+                    }}
+                  >
+                    Acesso Sede da Bener
+                  </span>
+                </div>
+                <p
+                  style={{
+                    fontSize: '12px',
+                    color: '#7f8c8d',
+                    margin: '4px 0 0 32px',
+                    lineHeight: '1.3',
+                  }}
+                >
+                  {benerHeadquartersAccess ? 'Visitante terá acesso à Sede da Bener' : 'Visitante não terá acesso à Sede da Bener'}
+                </p>
+              </div>
+
+              {/* Raffle Section - Only show if user is eligible */}
+              {isEligibleForRaffle && (
+                <div style={{ marginTop: '24px' }}>
+                  <h4
+                    style={{
+                      fontSize: '16px',
+                      fontWeight: '600',
+                      color: '#2c3e50',
+                      margin: '0 0 16px 0',
+                      paddingBottom: '8px',
+                      borderBottom: '2px solid #e9ecef',
+                    }}
+                  >
+                    Sorteios
+                  </h4>
+                  
+                  {/* Raffle Participation Checkbox */}
+                <div
+                  style={{
+                    marginBottom: '20px',
+                    padding: '16px',
+                    backgroundColor: '#f8f9fa',
+                    borderRadius: '12px',
+                    border: '1px solid #e9ecef',
+                  }}
+                >
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '12px',
+                      cursor: 'pointer',
+                    }}
+                    onClick={() => setMachines(!machines)}
+                  >
+                    <div
+                      style={{
+                        width: '20px',
+                        height: '20px',
+                        border: '2px solid #7ca066',
+                        borderRadius: '4px',
+                        backgroundColor: machines ? '#7ca066' : 'transparent',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        transition: 'all 0.2s ease',
+                      }}
+                    >
+                      {machines && (
+                        <svg
+                          width="12"
+                          height="12"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="white"
+                          strokeWidth="3"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <polyline points="20,6 9,17 4,12" />
+                        </svg>
+                      )}
+                    </div>
+                    <span
+                      style={{
+                        fontSize: '16px',
+                        fontWeight: '500',
+                        color: '#2c3e50',
+                      }}
+                    >
+                      Máquinas
+                    </span>
+                  </div>
+                  <p
+                    style={{
+                      fontSize: '12px',
+                      color: '#7f8c8d',
+                      margin: '4px 0 0 32px',
+                      lineHeight: '1.3',
+                    }}
+                  >
+                    {machines ? 'Visitante participará do sorteio de máquinas' : 'Visitante não participará do sorteio'}
+                  </p>
+                </div>
+<h4 style={{ fontSize: '16px', fontWeight: '600', color: '#2c3e50', margin: '0 0 16px 0', paddingBottom: '8px', borderBottom: '2px solid #e9ecef' }}>Sorteio de Alexa</h4>
+                  {/* Alexa Raffle Checkboxes - Compact and Horizontal */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      gap: '16px',
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      marginBottom: '16px',
+                    }}
+                  >
+                    {[
+                      { state: alexa1, setState: setAlexa1, label: 'Dia 1 (07/10)' },
+                      { state: alexa2, setState: setAlexa2, label: 'Dia 2 (08/10)' },
+                      { state: alexa3, setState: setAlexa3, label: 'Dia 3 (09/10)' }
+                    ].map(({ state, setState, label }, index) => (
+                      <div
+                        key={index}
+                        style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                          gap: '6px',
+                          cursor: 'pointer',
+                        }}
+                        onClick={() => setState(!state)}
+                      >
+                        <div
+                          style={{
+                            width: '16px',
+                            height: '16px',
+                            border: '2px solid #7ca066',
+                            borderRadius: '3px',
+                            backgroundColor: state ? '#7ca066' : 'transparent',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            transition: 'all 0.2s ease',
+                          }}
+                        >
+                          {state && (
+                            <svg
+                              width="10"
+                              height="10"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="white"
+                              strokeWidth="3"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            >
+                              <polyline points="20,6 9,17 4,12" />
+                            </svg>
+                          )}
+                        </div>
+                        <p
+                          style={{
+                            fontSize: '14px',
+                            fontWeight: '500',
+                            color: '#2c3e50',
+                          }}
+                        >
+                          {label}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+            {readUserData?.entrance_2025 ? (
               <>
                   <div 
                     style={{
@@ -392,7 +679,7 @@ const QrReader = ({ onBackToWelcome }: QrReaderProps) => {
                       e.currentTarget.style.color = '#7ca066'
                     }}
                   >
-                    {loading ? 'Registrando...' : 'Registrar nova entrada'}
+                    {loading ? 'Registrando...' : 'Atualizar registro'}
                 </button>
               </>
             ) : (

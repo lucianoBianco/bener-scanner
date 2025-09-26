@@ -13,6 +13,7 @@ const App = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isAdmin, setIsAdmin] = useState(false)
   const [showScanner, setShowScanner] = useState(false)
+  const [benerHeadquartersAccess, setBenerHeadquartersAccess] = useState(false)
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(fireAuth, async (user) => {
@@ -47,7 +48,8 @@ const App = () => {
     return () => unsubscribe()
   }, [])
 
-  const handleStartScanning = () => {
+  const handleStartScanning = (benerHeadquartersAccess: boolean) => {
+    setBenerHeadquartersAccess(benerHeadquartersAccess)
     setShowScanner(true)
   }
 
@@ -64,7 +66,7 @@ const App = () => {
             element={
               showScanner ? (
                 isAdmin ? (
-                  <QrReader onBackToWelcome={handleBackToWelcome} />
+                  <QrReader onBackToWelcome={handleBackToWelcome} defaultSuperiorFloorAccess={benerHeadquartersAccess} />
                 ) : (
                   <ExhibitorReader onBackToWelcome={handleBackToWelcome} />
                 )

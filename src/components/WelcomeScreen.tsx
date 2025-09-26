@@ -5,20 +5,28 @@ import logo from '../assets/XIII-Encontro-Tecnologico-Bener.png'
 import { collection, getDocs, limit, orderBy, query } from 'firebase/firestore'
 
 interface WelcomeScreenProps {
-  onStartScanning: () => void
+  onStartScanning: (benerHeadquartersAccess: boolean) => void
   isAdmin?: boolean
 }
 
 const WelcomeScreen = ({ onStartScanning, isAdmin = false }: WelcomeScreenProps) => {
   const [isLoading, setIsLoading] = useState(false)
   const [isLoggingOut, setIsLoggingOut] = useState(false)
-  const [interactions, setInteractions] = useState<any>([])
+  const [interactions, setInteractions] = useState<Array<{
+    id: string;
+    visitorName?: string;
+    visitorCompany?: string;
+    rating?: number;
+    interactionDate?: { toDate: () => Date };
+    [key: string]: unknown;
+  }>>([])
+  const [benerHeadquartersAccess, setBenerHeadquartersAccess] = useState(false)
 
   const handleStartScanning = () => {
     setIsLoading(true)
     // Small delay for better UX
     setTimeout(() => {
-      onStartScanning()
+      onStartScanning(benerHeadquartersAccess)
     }, 300)
   }
 
@@ -306,6 +314,76 @@ const WelcomeScreen = ({ onStartScanning, isAdmin = false }: WelcomeScreenProps)
           </div>
         </div>
 
+        {/* Superior Floor Access Checkbox - Only for Admin */}
+        {isAdmin && (
+          <div
+            style={{
+              backgroundColor: '#f8f9fa',
+              borderRadius: '16px',
+              padding: '20px',
+              width: '100%',
+              border: '1px solid #e9ecef',
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                cursor: 'pointer',
+              }}
+              onClick={() => setBenerHeadquartersAccess(!benerHeadquartersAccess)}
+            >
+              <div
+                style={{
+                  width: '24px',
+                  height: '24px',
+                  border: '2px solid #7ca066',
+                  borderRadius: '4px',
+                  backgroundColor: benerHeadquartersAccess ? '#7ca066' : 'transparent',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.2s ease',
+                }}
+              >
+                {benerHeadquartersAccess && (
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="white"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <polyline points="20,6 9,17 4,12" />
+                  </svg>
+                )}
+              </div>
+              <span
+                style={{
+                  fontSize: '16px',
+                  fontWeight: '500',
+                  color: '#2c3e50',
+                }}
+              >
+                Acesso Sede da Bener
+              </span>
+            </div>
+            <p
+              style={{
+                fontSize: '14px',
+                color: '#7f8c8d',
+                margin: '8px 0 0 36px',
+                lineHeight: '1.4',
+              }}
+            >
+              Quando ativado, todos os QR codes lidos terão acesso à Sede da Bener por padrão
+            </p>
+          </div>
+        )}
         {/* Start Button */}
         <button
           style={{
@@ -378,18 +456,18 @@ const WelcomeScreen = ({ onStartScanning, isAdmin = false }: WelcomeScreenProps)
           flexDirection: 'column',
           justifyContent: 'flex-start',
         }}>
-          {interactions.map((interaction: any) => {
+          {interactions.map((interaction) => {
             const name = interaction.visitorName;
             const company = interaction.visitorCompany;
             const rating = interaction.rating;
-            const date = new Date(interaction.interactionDate.toDate()).toLocaleString();
+            const date = interaction.interactionDate ? new Date(interaction.interactionDate.toDate()).toLocaleString() : 'Data não disponível';
             return (
               <div style={{ outline: 'solid 2px #a0a0a0', textAlign: 'left', padding: '10px', marginBottom: '15px', borderRadius: '10px', }}>
                 <h3>
                   {name} - <span style={{ fontSize: '12px', color: '#666' }}>{company}</span>
                 </h3>
                 <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: '14px' }}>{renderStars(rating)}</span>
+                  <span style={{ fontSize: '14px' }}>{renderStars(rating || 0)}</span>
                   <span style={{ fontSize: '12px' }}>{date}</span>
                 </div>
               </div>)
